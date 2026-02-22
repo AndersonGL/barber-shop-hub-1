@@ -89,12 +89,13 @@ const Index = () => {
 
       {/* Hero */}
       <section className="relative h-64 md:h-80 overflow-hidden">
-        <img src={heroImage} alt="Shopping Barber" className="w-full h-full object-cover" />
+        <img src={heroImage} alt="Cavalheiro Gentleman Club" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
-          <h1 className="text-3xl md:text-5xl font-bold font-display tracking-wider text-gradient-gold mb-2">
-            SHOPPING BARBER
+          <h1 className="text-3xl md:text-5xl font-bold font-display tracking-wider text-gradient-gold mb-1">
+            CAVALHEIRO
           </h1>
+          <p className="text-sm tracking-widest text-muted-foreground uppercase mb-2">Gentleman Club</p>
           <p className="text-foreground/80 max-w-md">
             Produtos profissionais direto da fábrica para sua barbearia
           </p>

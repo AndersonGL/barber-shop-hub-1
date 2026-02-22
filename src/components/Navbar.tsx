@@ -25,7 +25,10 @@ const Navbar = ({ cartCount = 0 }: NavbarProps) => {
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <Scissors className="h-6 w-6 text-primary" />
-          <span className="text-xl font-bold font-display tracking-wider text-gradient-gold">SHOPPING BARBER</span>
+          <div className="flex flex-col leading-tight">
+            <span className="text-xl font-bold font-display tracking-wider text-gradient-gold">CAVALHEIRO</span>
+            <span className="text-[10px] tracking-widest text-muted-foreground uppercase">Gentleman Club</span>
+          </div>
         </Link>
 
         <div className="flex items-center gap-2">

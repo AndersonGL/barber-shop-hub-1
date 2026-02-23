@@ -44,7 +44,7 @@ const ProductCard = ({ product, isFavorite, onToggleFavorite, onAddToCart, isAdm
           <button
             onClick={() => onAddToCart(product.id)}
             className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-primary to-primary/80 text-primary-foreground
-                       translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out
+                       sm:translate-y-full sm:group-hover:translate-y-0 transition-transform duration-300 ease-out
                        flex items-center justify-center gap-2 py-3 font-display tracking-wider text-xs font-bold"
           >
             <ShoppingCart className="h-3.5 w-3.5" />

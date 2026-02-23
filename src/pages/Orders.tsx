@@ -3,7 +3,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import Navbar from '@/components/Navbar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Package, Truck, CheckCircle, Clock, MapPin } from 'lucide-react';
+import { toast } from 'sonner';
 
 type OrderWithItems = {
   id: string;
@@ -69,6 +71,23 @@ const Orders = () => {
     setLoading(false);
   };
 
+  const confirmDelivery = async (orderId: string) => {
+    if (!confirm('Confirmar que você recebeu o pedido?')) return;
+    const { data, error } = await supabase.rpc('confirm_delivery', {
+      _order_id: orderId,
+    });
+    if (error) {
+      toast.error(`Erro ao confirmar: ${error.message}`);
+      return;
+    }
+    if (!data) {
+      toast.error('Não foi possível confirmar o recebimento.');
+      return;
+    }
+    toast.success('Recebimento confirmado! Obrigado.');
+    fetchOrders();
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -85,7 +104,7 @@ const Orders = () => {
         ) : (
           <div className="space-y-5">
             {orders.map(order => {
-              const st = statusMap[order.status] || statusMap.confirmed;
+              const st = statusMap[order.shipping_status] || statusMap[order.status] || statusMap.confirmed;
               const StatusIcon = st.icon;
               const currentStep = stepIndex(order.shipping_status || order.status);
 
@@ -167,6 +186,19 @@ const Orders = () => {
                         <p className="text-xs text-muted-foreground">Código de Rastreio</p>
                         <p className="font-mono text-sm font-bold text-foreground">{order.tracking_code}</p>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Confirm receipt button */}
+                  {order.shipping_status === 'shipped' && (
+                    <div className="mx-5 mb-4">
+                      <Button
+                        className="w-full bg-green-600 hover:bg-green-700 text-white font-display tracking-wide"
+                        onClick={() => confirmDelivery(order.id)}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        CONFIRMAR RECEBIMENTO
+                      </Button>
                     </div>
                   )}
 

@@ -22,6 +22,7 @@ import {
   Package,
   Truck,
   Send,
+  CheckCircle,
 } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -191,6 +192,20 @@ const Admin = () => {
     }
 
     toast.success("Pedido excluído com sucesso!");
+    fetchOrders();
+  };
+
+  const handleMarkAsDelivered = async (id: string) => {
+    if (!confirm("Marcar pedido como entregue?")) return;
+    const { error } = await supabase
+      .from("orders")
+      .update({ shipping_status: "delivered" })
+      .eq("id", id);
+    if (error) {
+      toast.error(`Erro ao atualizar pedido: ${error.message}`);
+      return;
+    }
+    toast.success("Pedido marcado como entregue!");
     fetchOrders();
   };
 
@@ -393,9 +408,8 @@ const Admin = () => {
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {order.profile?.company_name || "Cliente"} •{" "}
-                          {new Date(order.created_at).toLocaleDateString(
-                            "pt-BR",
-                          )}
+                          {new Date(order.created_at).toLocaleDateString("pt-BR")}{" "}
+                          {new Date(order.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                         </p>
                         <p className="text-sm text-primary font-bold mt-1">
                           R$ {Number(order.total_amount).toFixed(2)}
@@ -427,14 +441,8 @@ const Admin = () => {
                               Enviar
                             </Button>
                           )}
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="text-destructive h-8 w-8"
-                          onClick={() => handleDeleteOrder(order.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+
+
                       </div>
                     </div>
                   </div>

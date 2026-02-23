@@ -169,9 +169,28 @@ const Admin = () => {
 
   const handleDeleteOrder = async (id: string) => {
     if (!confirm("Excluir este pedido?")) return;
-    await supabase.from("order_items").delete().eq("order_id", id);
-    await supabase.from("orders").delete().eq("id", id);
-    toast.success("Pedido excluído");
+
+    const { error: itemsError } = await supabase
+      .from("order_items")
+      .delete()
+      .eq("order_id", id);
+
+    if (itemsError) {
+      toast.error(`Erro ao excluir itens do pedido: ${itemsError.message}`);
+      return;
+    }
+
+    const { error: orderError } = await supabase
+      .from("orders")
+      .delete()
+      .eq("id", id);
+
+    if (orderError) {
+      toast.error(`Erro ao excluir pedido: ${orderError.message}`);
+      return;
+    }
+
+    toast.success("Pedido excluído com sucesso!");
     fetchOrders();
   };
 

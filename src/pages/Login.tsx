@@ -37,7 +37,7 @@ const Login = () => {
           <div className="flex items-center justify-center gap-3 mb-4">
             <Scissors className="h-10 w-10 text-primary" />
             <h1 className="text-4xl font-bold font-display tracking-wider text-gradient-gold">
-              SHOPPING BARBER
+              CAVALHEIRO GENTLEMAN CLUB
             </h1>
           </div>
           <p className="text-muted-foreground">Produtos profissionais para sua barbearia</p>

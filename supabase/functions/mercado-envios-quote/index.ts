@@ -112,11 +112,18 @@ serve(async (req) => {
 
     const shippingCost = Number(selected.list_cost ?? selected.cost ?? 0);
     const shippingDays = Number(selected.estimated_delivery_time?.shipping ?? 0);
+    const carrierName = selected?.company?.name
+      || selected?.carrier?.name
+      || selected?.shipping_method?.name
+      || selected?.name
+      || selected?.display
+      || "Mercado Envios";
 
     return new Response(JSON.stringify({
       shippingCost,
       shippingDays,
-      serviceName: selected.name || selected.display || "Mercado Envios",
+      serviceName: selected.name || selected.display || carrierName,
+      carrierName,
       raw: selected,
     }), {
       status: 200,

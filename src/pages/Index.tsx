@@ -101,7 +101,7 @@ const Index = () => {
           </p>
           <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
             <Truck className="h-4 w-4 text-primary" />
-            <span>Entrega via <strong className="text-primary">TransBarber Express</strong> — Integração fictícia</span>
+            <span>Entrega via <strong className="text-primary">Mercado Envios</strong></span>
           </div>
         </div>
       </section>

@@ -14,6 +14,7 @@ type ShippingInfo = {
   cost: number;
   days: number;
   serviceName: string;
+  carrierName: string;
 };
 
 const paymentMethods = [
@@ -25,17 +26,17 @@ const paymentMethods = [
 
 const calculateShippingFallback = (cep: string): ShippingInfo => {
   const prefix = parseInt(cep.substring(0, 2), 10);
-  if (prefix >= 1 && prefix <= 9) return { cost: 12.9, days: 2, serviceName: 'Mercado Envios (fallback)' };
-  if (prefix >= 10 && prefix <= 19) return { cost: 18.9, days: 3, serviceName: 'Mercado Envios (fallback)' };
-  if (prefix >= 20 && prefix <= 28) return { cost: 22.9, days: 4, serviceName: 'Mercado Envios (fallback)' };
-  if (prefix >= 29 && prefix <= 29) return { cost: 24.9, days: 4, serviceName: 'Mercado Envios (fallback)' };
-  if (prefix >= 30 && prefix <= 39) return { cost: 22.9, days: 4, serviceName: 'Mercado Envios (fallback)' };
-  if (prefix >= 40 && prefix <= 49) return { cost: 32.9, days: 6, serviceName: 'Mercado Envios (fallback)' };
-  if (prefix >= 50 && prefix <= 59) return { cost: 35.9, days: 7, serviceName: 'Mercado Envios (fallback)' };
-  if (prefix >= 60 && prefix <= 69) return { cost: 38.9, days: 8, serviceName: 'Mercado Envios (fallback)' };
-  if (prefix >= 70 && prefix <= 79) return { cost: 28.9, days: 5, serviceName: 'Mercado Envios (fallback)' };
-  if (prefix >= 80 && prefix <= 99) return { cost: 25.9, days: 5, serviceName: 'Mercado Envios (fallback)' };
-  return { cost: 35, days: 7, serviceName: 'Mercado Envios (fallback)' };
+  if (prefix >= 1 && prefix <= 9) return { cost: 12.9, days: 2, serviceName: 'Mercado Envios', carrierName: 'Mercado Envios' };
+  if (prefix >= 10 && prefix <= 19) return { cost: 18.9, days: 3, serviceName: 'Mercado Envios', carrierName: 'Mercado Envios' };
+  if (prefix >= 20 && prefix <= 28) return { cost: 22.9, days: 4, serviceName: 'Mercado Envios', carrierName: 'Mercado Envios' };
+  if (prefix >= 29 && prefix <= 29) return { cost: 24.9, days: 4, serviceName: 'Mercado Envios', carrierName: 'Mercado Envios' };
+  if (prefix >= 30 && prefix <= 39) return { cost: 22.9, days: 4, serviceName: 'Mercado Envios', carrierName: 'Mercado Envios' };
+  if (prefix >= 40 && prefix <= 49) return { cost: 32.9, days: 6, serviceName: 'Mercado Envios', carrierName: 'Mercado Envios' };
+  if (prefix >= 50 && prefix <= 59) return { cost: 35.9, days: 7, serviceName: 'Mercado Envios', carrierName: 'Mercado Envios' };
+  if (prefix >= 60 && prefix <= 69) return { cost: 38.9, days: 8, serviceName: 'Mercado Envios', carrierName: 'Mercado Envios' };
+  if (prefix >= 70 && prefix <= 79) return { cost: 28.9, days: 5, serviceName: 'Mercado Envios', carrierName: 'Mercado Envios' };
+  if (prefix >= 80 && prefix <= 99) return { cost: 25.9, days: 5, serviceName: 'Mercado Envios', carrierName: 'Mercado Envios' };
+  return { cost: 35, days: 7, serviceName: 'Mercado Envios', carrierName: 'Mercado Envios' };
 };
 
 const Checkout = () => {
@@ -160,6 +161,7 @@ const Checkout = () => {
         cost: Number(data.shippingCost || 0),
         days: Number(data.shippingDays || 0),
         serviceName: data.serviceName || 'Mercado Envios',
+        carrierName: data.carrierName || data.serviceName || 'Mercado Envios',
       });
     } catch (error) {
       console.error('Falha ao consultar Mercado Envios:', error);
@@ -399,10 +401,10 @@ const Checkout = () => {
           {shippingInfo && (
             <div className="bg-card rounded-lg p-4 border border-primary/30 bg-primary/5">
               <h2 className="font-display font-semibold mb-2 flex items-center gap-2">
-                <Truck className="h-4 w-4 text-primary" /> {shippingInfo.serviceName}
+                <Truck className="h-4 w-4 text-primary" /> Frete via Mercado Envios
               </h2>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Frete calculado pelo Mercado Envios</span>
+                <span className="text-muted-foreground">Transportadora: {shippingInfo.carrierName}</span>
                 <span className="font-semibold">R$ {shippingInfo.cost.toFixed(2)}</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">Prazo estimado: {shippingInfo.days || 0} dias úteis</p>

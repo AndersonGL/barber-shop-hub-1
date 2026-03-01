@@ -4,6 +4,33 @@
 
 ## 🚀 Funcionalidades
 
+## 💳 Integrações de Pagamento e Frete
+
+O checkout foi integrado com **Mercado Pago** (meios de pagamento) e **Mercado Envios** (cotação de frete).
+
+### Edge Functions criadas
+
+- `mercado-envios-quote`
+- `mercado-pago-create-preference`
+- `mercado-pago-webhook`
+
+### Secrets esperados no Supabase
+
+- `MERCADO_PAGO_ACCESS_TOKEN`
+- `MERCADO_PAGO_WEBHOOK_URL` (opcional)
+- `MERCADO_PAGO_WEBHOOK_TOKEN` (opcional, recomendado para validar chamadas do webhook)
+- `MERCADO_ENVIOS_API_URL` (opcional, padrão: API pública Mercado Envios)
+- `MERCADO_ENVIOS_ACCESS_TOKEN` (opcional, quando o endpoint exigir autenticação)
+- `FRONTEND_URL` (ex.: URL do Vercel/Netlify para retorno do pagamento)
+
+### Como publicar funções
+
+```bash
+supabase functions deploy mercado-envios-quote
+supabase functions deploy mercado-pago-create-preference
+supabase functions deploy mercado-pago-webhook
+```
+
 ### Para Clientes
 
 - **Agendamento Fácil**: Encontre barbearias e agende horários instantaneamente.

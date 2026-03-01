@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,37 +10,32 @@ import type { Tables } from '@/integrations/supabase/types';
 
 type CartItemWithProduct = Tables<'cart_items'> & { products: Tables<'products'> };
 
+type ShippingInfo = {
+  cost: number;
+  days: number;
+  serviceName: string;
+};
+
 const paymentMethods = [
-  { id: 'pix', label: 'PIX', icon: QrCode, description: 'Pagamento instantâneo' },
-  { id: 'debit', label: 'Débito', icon: Banknote, description: 'Cartão de débito' },
-  { id: 'credit_1x', label: 'Crédito 1x', icon: CreditCard, description: 'Sem juros' },
-  { id: 'credit_12x', label: 'Crédito 12x', icon: CreditCard, description: 'Com juros' },
+  { id: 'pix', label: 'PIX', icon: QrCode, description: 'Pagamento instantâneo via Mercado Pago' },
+  { id: 'debit', label: 'Débito', icon: Banknote, description: 'Cartão de débito via Mercado Pago' },
+  { id: 'credit_1x', label: 'Crédito 1x', icon: CreditCard, description: 'Cartão de crédito à vista' },
+  { id: 'credit_12x', label: 'Crédito 12x', icon: CreditCard, description: 'Cartão de crédito parcelado' },
 ];
 
-// Simulated shipping calculation based on CEP region
-const calculateShippingByCep = (cep: string): { cost: number; days: number; region: string } => {
+const calculateShippingFallback = (cep: string): ShippingInfo => {
   const prefix = parseInt(cep.substring(0, 2), 10);
-  // SP capital / Grande SP
-  if (prefix >= 1 && prefix <= 9) return { cost: 12.90, days: 2, region: 'São Paulo - Capital' };
-  // SP interior
-  if (prefix >= 10 && prefix <= 19) return { cost: 18.90, days: 3, region: 'São Paulo - Interior' };
-  // RJ
-  if (prefix >= 20 && prefix <= 28) return { cost: 22.90, days: 4, region: 'Rio de Janeiro' };
-  // ES
-  if (prefix >= 29 && prefix <= 29) return { cost: 24.90, days: 4, region: 'Espírito Santo' };
-  // MG
-  if (prefix >= 30 && prefix <= 39) return { cost: 22.90, days: 4, region: 'Minas Gerais' };
-  // BA / SE
-  if (prefix >= 40 && prefix <= 49) return { cost: 32.90, days: 6, region: 'Bahia / Sergipe' };
-  // PE / AL / PB / RN
-  if (prefix >= 50 && prefix <= 59) return { cost: 35.90, days: 7, region: 'Nordeste' };
-  // CE / PI / MA / PA / AP / AM / RR / AC / RO
-  if (prefix >= 60 && prefix <= 69) return { cost: 38.90, days: 8, region: 'Norte / Nordeste' };
-  // DF / GO / TO / MT / MS
-  if (prefix >= 70 && prefix <= 79) return { cost: 28.90, days: 5, region: 'Centro-Oeste' };
-  // PR / SC / RS
-  if (prefix >= 80 && prefix <= 99) return { cost: 25.90, days: 5, region: 'Sul' };
-  return { cost: 35.00, days: 7, region: 'Brasil' };
+  if (prefix >= 1 && prefix <= 9) return { cost: 12.9, days: 2, serviceName: 'Mercado Envios (fallback)' };
+  if (prefix >= 10 && prefix <= 19) return { cost: 18.9, days: 3, serviceName: 'Mercado Envios (fallback)' };
+  if (prefix >= 20 && prefix <= 28) return { cost: 22.9, days: 4, serviceName: 'Mercado Envios (fallback)' };
+  if (prefix >= 29 && prefix <= 29) return { cost: 24.9, days: 4, serviceName: 'Mercado Envios (fallback)' };
+  if (prefix >= 30 && prefix <= 39) return { cost: 22.9, days: 4, serviceName: 'Mercado Envios (fallback)' };
+  if (prefix >= 40 && prefix <= 49) return { cost: 32.9, days: 6, serviceName: 'Mercado Envios (fallback)' };
+  if (prefix >= 50 && prefix <= 59) return { cost: 35.9, days: 7, serviceName: 'Mercado Envios (fallback)' };
+  if (prefix >= 60 && prefix <= 69) return { cost: 38.9, days: 8, serviceName: 'Mercado Envios (fallback)' };
+  if (prefix >= 70 && prefix <= 79) return { cost: 28.9, days: 5, serviceName: 'Mercado Envios (fallback)' };
+  if (prefix >= 80 && prefix <= 99) return { cost: 25.9, days: 5, serviceName: 'Mercado Envios (fallback)' };
+  return { cost: 35, days: 7, serviceName: 'Mercado Envios (fallback)' };
 };
 
 const Checkout = () => {
@@ -50,15 +45,87 @@ const Checkout = () => {
   const [selectedPayment, setSelectedPayment] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [shippingInfo, setShippingInfo] = useState<{ cost: number; days: number; region: string } | null>(null);
-  const [customerAddress, setCustomerAddress] = useState<{ cep: string; street: string; number: string; city: string; state: string; neighborhood: string } | null>(null);
+  const [shippingInfo, setShippingInfo] = useState<ShippingInfo | null>(null);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [returnProcessing, setReturnProcessing] = useState(false);
+  const [customerAddress, setCustomerAddress] = useState<{
+    cep: string;
+    street: string;
+    number: string;
+    city: string;
+    state: string;
+    neighborhood: string;
+  } | null>(null);
+
+  const subtotal = useMemo(
+    () => items.reduce((sum, item) => sum + Number(item.products.price) * item.quantity, 0),
+    [items],
+  );
+  const shipping = shippingInfo ? shippingInfo.cost : 0;
+  const total = subtotal + shipping;
 
   useEffect(() => {
-    if (user) {
-      fetchCart();
-      fetchAddress();
-    }
+    if (!user) return;
+    fetchCart();
+    fetchAddress();
   }, [user]);
+
+  useEffect(() => {
+    if (!customerAddress?.cep) return;
+    quoteShipping(customerAddress.cep);
+  }, [customerAddress?.cep, subtotal]);
+
+  useEffect(() => {
+    if (!user) return;
+    handleMercadoPagoReturn();
+  }, [user]);
+
+  const getToken = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    return sessionData?.session?.access_token || null;
+  };
+
+  const invokeEdgeFunction = async (name: string, body: Record<string, unknown>) => {
+    const token = await getToken();
+    if (!token) throw new Error('Sessão inválida');
+
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const baseUrl = projectId
+      ? `https://${projectId}.supabase.co`
+      : supabaseUrl;
+
+    if (!baseUrl) {
+      throw new Error('Configuração inválida: VITE_SUPABASE_PROJECT_ID/VITE_SUPABASE_URL ausente.');
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/functions/v1/${name}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new Error(`Falha de conexão com a função ${name}. Verifique deploy/permissão no Supabase.`);
+    }
+
+    const responseText = await response.text();
+    const data = responseText ? JSON.parse(responseText) : null;
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error(`Função ${name} não encontrada no Supabase (deploy pendente).`);
+      }
+
+      throw new Error(data?.error || `Erro na função ${name}`);
+    }
+
+    return data;
+  };
 
   const fetchCart = async () => {
     if (!user) return;
@@ -68,87 +135,223 @@ const Checkout = () => {
 
   const fetchAddress = async () => {
     if (!user) return;
-    const { data } = await supabase.from('profiles').select('cep, street, number, city, state, neighborhood').eq('user_id', user.id).maybeSingle();
+
+    const { data } = await supabase
+      .from('profiles')
+      .select('cep, street, number, city, state, neighborhood')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
     if (data?.cep) {
       setCustomerAddress(data as any);
-      const info = calculateShippingByCep(data.cep);
-      setShippingInfo(info);
     }
   };
 
-  const subtotal = items.reduce((sum, i) => sum + Number(i.products.price) * i.quantity, 0);
-  const shipping = shippingInfo ? shippingInfo.cost : items.reduce((sum, i) => sum + Number(i.products.shipping_cost), 0);
-  const total = subtotal + shipping;
+  const quoteShipping = async (cep: string) => {
+    setShippingLoading(true);
+
+    try {
+      const data = await invokeEdgeFunction('mercado-envios-quote', {
+        cep,
+        declaredValue: Number(subtotal.toFixed(2)),
+      });
+
+      setShippingInfo({
+        cost: Number(data.shippingCost || 0),
+        days: Number(data.shippingDays || 0),
+        serviceName: data.serviceName || 'Mercado Envios',
+      });
+    } catch (error) {
+      console.error('Falha ao consultar Mercado Envios:', error);
+      const fallback = calculateShippingFallback(cep);
+      setShippingInfo(fallback);
+      toast.warning('Mercado Envios indisponível no momento. Frete estimado aplicado.');
+    } finally {
+      setShippingLoading(false);
+    }
+  };
+
+  const sendOrderConfirmationEmail = async (
+    orderId: string,
+    paymentMethod: string,
+    trackingCode: string,
+    shippingCost: number,
+  ) => {
+    if (!user?.email) return;
+
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('quantity, price_at_purchase, products(name)')
+        .eq('order_id', orderId);
+
+      const itemsForEmail = (orderItems || []).map((item: any) => ({
+        name: item.products?.name || 'Produto',
+        quantity: item.quantity,
+        price: Number(item.price_at_purchase),
+      }));
+
+      const totalAmount = itemsForEmail.reduce((sum, item) => sum + item.price * item.quantity, 0) + shippingCost;
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+
+      await fetch(`https://${projectId}.supabase.co/functions/v1/send-order-email`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orderId,
+          customerEmail: user.email,
+          customerName: profile?.company_name || 'Cliente',
+          items: itemsForEmail,
+          total: totalAmount,
+          shipping: shippingCost,
+          trackingCode,
+          paymentMethod,
+        }),
+      });
+    } catch (error) {
+      console.error('Falha ao enviar email de confirmação:', error);
+    }
+  };
+
+  const handleMercadoPagoReturn = async () => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get('payment_status');
+    const orderId = params.get('order_id');
+
+    if (!paymentStatus || !orderId || returnProcessing) return;
+
+    setReturnProcessing(true);
+
+    try {
+      if (paymentStatus === 'approved') {
+        const trackingCode = `TB${Date.now().toString(36).toUpperCase()}`;
+
+        const { data: updatedOrder, error: updateError } = await supabase
+          .from('orders')
+          .update({
+            status: 'confirmed',
+            shipping_status: 'processing',
+            tracking_code: trackingCode,
+          })
+          .eq('id', orderId)
+          .eq('user_id', user?.id || '')
+          .select('id, payment_method, shipping_cost')
+          .single();
+
+        if (updateError || !updatedOrder) {
+          throw new Error('Não foi possível confirmar o pedido após pagamento aprovado.');
+        }
+
+        await supabase.from('cart_items').delete().eq('user_id', user?.id || '');
+
+        await sendOrderConfirmationEmail(
+          updatedOrder.id,
+          updatedOrder.payment_method,
+          trackingCode,
+          Number(updatedOrder.shipping_cost),
+        );
+
+        await fetchCart();
+        setSuccess(true);
+        toast.success('Pagamento aprovado! Pedido confirmado com sucesso.');
+      } else if (paymentStatus === 'pending') {
+        toast.message('Pagamento pendente. Assim que aprovado, seu pedido será atualizado.');
+      } else {
+        toast.error('Pagamento não aprovado. Tente novamente com outro meio de pagamento.');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Erro ao processar retorno do pagamento.');
+    } finally {
+      window.history.replaceState({}, document.title, '/checkout');
+      setReturnProcessing(false);
+    }
+  };
 
   const handleCheckout = async () => {
     if (!user || !selectedPayment) {
       toast.error('Selecione uma forma de pagamento');
       return;
     }
-    setLoading(true);
 
-    const { data: order, error: orderError } = await supabase.from('orders').insert({
-      user_id: user.id,
-      total_amount: total,
-      shipping_cost: shipping,
-      payment_method: selectedPayment,
-      status: 'confirmed',
-      shipping_status: 'processing',
-      tracking_code: `TB${Date.now().toString(36).toUpperCase()}`,
-    }).select().single();
-
-    if (orderError || !order) {
-      toast.error('Erro ao criar pedido');
-      setLoading(false);
+    if (!customerAddress?.cep) {
+      toast.error('Cadastre um endereço antes de continuar');
       return;
     }
 
-    const orderItems = items.map(item => ({
-      order_id: order.id,
-      product_id: item.product_id,
-      quantity: item.quantity,
-      price_at_purchase: Number(item.products.price),
-    }));
-    await supabase.from('order_items').insert(orderItems);
-    await supabase.from('cart_items').delete().eq('user_id', user.id);
-
-    // Send order confirmation email
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (token && user.email) {
-        const emailItems = items.map(item => ({
-          name: item.products.name,
-          quantity: item.quantity,
-          price: Number(item.products.price),
-        }));
-
-        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-        await fetch(`https://${projectId}.supabase.co/functions/v1/send-order-email`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            orderId: order.id,
-            customerEmail: user.email,
-            customerName: profile?.company_name || 'Cliente',
-            items: emailItems,
-            total,
-            shipping,
-            trackingCode: order.tracking_code,
-            paymentMethod: selectedPayment,
-          }),
-        });
-      }
-    } catch (emailError) {
-      // Email error is non-blocking — order is already confirmed
-      console.error('Email sending failed:', emailError);
+    if (!shippingInfo) {
+      toast.error('Aguarde o cálculo de frete para continuar');
+      return;
     }
 
-    setSuccess(true);
-    setLoading(false);
+    if (!items.length) {
+      toast.error('Seu carrinho está vazio');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          total_amount: total,
+          shipping_cost: shipping,
+          payment_method: selectedPayment,
+          status: 'pending',
+          shipping_status: 'pending',
+          tracking_code: null,
+        })
+        .select()
+        .single();
+
+      if (orderError || !order) {
+        throw new Error('Erro ao criar pedido');
+      }
+
+      const orderItems = items.map((item) => ({
+        order_id: order.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        price_at_purchase: Number(item.products.price),
+      }));
+
+      const { error: orderItemsError } = await supabase.from('order_items').insert(orderItems);
+      if (orderItemsError) {
+        throw new Error('Erro ao criar itens do pedido');
+      }
+
+      const preferenceData = await invokeEdgeFunction('mercado-pago-create-preference', {
+        orderId: order.id,
+        items: items.map((item) => ({
+          title: item.products.name,
+          quantity: item.quantity,
+          unit_price: Number(item.products.price),
+          currency_id: 'BRL',
+        })),
+        shippingCost: shipping,
+        payerEmail: user.email,
+        paymentMethod: selectedPayment,
+      });
+
+      const redirectUrl = preferenceData.initPoint || preferenceData.sandboxInitPoint;
+      if (!redirectUrl) {
+        throw new Error('Mercado Pago não retornou URL de pagamento');
+      }
+
+      window.location.href = redirectUrl;
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Erro ao iniciar pagamento');
+      setLoading(false);
+    }
   };
 
   if (success) {
@@ -157,9 +360,9 @@ const Checkout = () => {
         <Navbar />
         <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 text-center animate-fade-in">
           <CheckCircle className="h-20 w-20 text-primary mb-6" />
-          <h1 className="text-3xl font-bold font-display tracking-wider text-gradient-gold mb-4">PEDIDO CONFIRMADO!</h1>
-          <p className="text-muted-foreground mb-2">Seu pedido foi realizado com sucesso.</p>
-          <p className="text-sm text-muted-foreground mb-6">Acompanhe o envio via TransBarber Express nos seus pedidos.</p>
+          <h1 className="text-3xl font-bold font-display tracking-wider text-gradient-gold mb-4">PAGAMENTO APROVADO!</h1>
+          <p className="text-muted-foreground mb-2">Seu pedido foi confirmado com sucesso.</p>
+          <p className="text-sm text-muted-foreground mb-6">Você pode acompanhar o envio em Meus Pedidos.</p>
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => navigate('/orders')}>Ver Pedidos</Button>
             <Button className="bg-gradient-gold text-primary-foreground" onClick={() => navigate('/')}>Continuar Comprando</Button>
@@ -176,7 +379,6 @@ const Checkout = () => {
         <h1 className="text-2xl font-bold font-display tracking-wider text-gradient-gold mb-6">CHECKOUT</h1>
 
         <div className="space-y-4">
-          {/* Delivery address */}
           <div className="bg-card rounded-lg p-4 border border-border">
             <h2 className="font-display font-semibold mb-3 flex items-center gap-2">
               <MapPin className="h-4 w-4 text-primary" /> Endereço de Entrega
@@ -194,21 +396,19 @@ const Checkout = () => {
             )}
           </div>
 
-          {/* Shipping info */}
           {shippingInfo && (
             <div className="bg-card rounded-lg p-4 border border-primary/30 bg-primary/5">
               <h2 className="font-display font-semibold mb-2 flex items-center gap-2">
-                <Truck className="h-4 w-4 text-primary" /> Frete TransBarber Express
+                <Truck className="h-4 w-4 text-primary" /> {shippingInfo.serviceName}
               </h2>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Região: {shippingInfo.region}</span>
+                <span className="text-muted-foreground">Frete calculado pelo Mercado Envios</span>
                 <span className="font-semibold">R$ {shippingInfo.cost.toFixed(2)}</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Prazo estimado: {shippingInfo.days} dias úteis</p>
+              <p className="text-xs text-muted-foreground mt-1">Prazo estimado: {shippingInfo.days || 0} dias úteis</p>
             </div>
           )}
 
-          {/* Order summary */}
           <div className="bg-card rounded-lg p-4 border border-border">
             <h2 className="font-display font-semibold mb-3">Resumo ({items.length} itens)</h2>
             {items.map(item => (
@@ -219,7 +419,7 @@ const Checkout = () => {
             ))}
             <div className="border-t border-border mt-3 pt-3 flex justify-between text-sm">
               <span className="text-muted-foreground">Frete</span>
-              <span>R$ {shipping.toFixed(2)}</span>
+              <span>{shippingLoading ? 'Calculando...' : `R$ ${shipping.toFixed(2)}`}</span>
             </div>
             <div className="flex justify-between font-bold text-lg mt-2">
               <span className="font-display">TOTAL</span>
@@ -227,9 +427,8 @@ const Checkout = () => {
             </div>
           </div>
 
-          {/* Payment */}
           <div className="bg-card rounded-lg p-4 border border-border">
-            <h2 className="font-display font-semibold mb-3">Forma de Pagamento</h2>
+            <h2 className="font-display font-semibold mb-3">Forma de Pagamento (Mercado Pago)</h2>
             <div className="grid grid-cols-2 gap-3">
               {paymentMethods.map(pm => (
                 <button
@@ -251,10 +450,10 @@ const Checkout = () => {
 
           <Button
             className="w-full bg-gradient-gold text-primary-foreground font-display tracking-wider"
-            disabled={loading || !selectedPayment}
+            disabled={loading || returnProcessing || !selectedPayment || shippingLoading || !shippingInfo}
             onClick={handleCheckout}
           >
-            {loading ? 'Processando...' : 'CONFIRMAR PEDIDO'}
+            {loading ? 'Redirecionando para Mercado Pago...' : 'PAGAR COM MERCADO PAGO'}
           </Button>
         </div>
       </main>

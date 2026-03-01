@@ -2,3 +2,12 @@ project_id = "wjktlktslzfdelzavash"
 
 [functions.send-order-email]
 verify_jwt = false
+
+[functions.mercado-envios-quote]
+verify_jwt = false
+
+[functions.mercado-pago-create-preference]
+verify_jwt = false
+
+[functions.mercado-pago-webhook]
+verify_jwt = false
